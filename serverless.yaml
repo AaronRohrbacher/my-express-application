@@ -2,12 +2,22 @@
 
 service: my-express-application
 
+plugins:
+  - serverless-dynamodb-local
+  - serverless-offline
+
 custom:
   tableName: "users-table-${self:provider.stage}"
+  dynamodb:
+    stages:
+      - dev
+  serverless-offline:
+    noPrependStageInUrl: true
+
 
 provider:
   name: aws
-  runtime: nodejs16.x
+  runtime: nodejs18.x
   stage: dev
   region: us-west-2
   iamRoleStatements:
