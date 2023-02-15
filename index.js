@@ -5,10 +5,12 @@ const bodyParser = require('body-parser');
 const express = require('express')
 const app = express()
 const AWS = require('aws-sdk');
+const cognito = new AWS.CognitoIdentityServiceProvider({ apiVersion: '2016-04-18' })
+
 
 
 const USERS_TABLE = process.env.USERS_TABLE;
-	
+
 const IS_OFFLINE = process.env.IS_OFFLINE;
 let dynamoDb;
 if (IS_OFFLINE === 'true') {
@@ -24,7 +26,7 @@ if (IS_OFFLINE === 'true') {
 app.use(bodyParser.json({ strict: false }));
 
 app.get('/', function (req, res) {
-  res.send('Hello World!')
+  res.send('Hello World')
 })
 
 // Get User endpoint
@@ -42,7 +44,7 @@ app.get('/users/:userId', function (req, res) {
       res.status(400).json({ error: 'Could not get user' });
     }
     if (result.Item) {
-      const {userId, name} = result.Item;
+      const { userId, name } = result.Item;
       res.json({ userId, name });
     } else {
       res.status(404).json({ error: "User not found" });
@@ -56,7 +58,7 @@ app.post('/users', function (req, res) {
   if (typeof userId !== 'string') {
     return res.status(400).json({ error: '"userId" must be a string' });
   } else if (typeof name !== 'string') {
-   return res.status(400).json({ error: '"name" must be a string' });
+    return res.status(400).json({ error: '"name" must be a string' });
   }
 
   const params = {
