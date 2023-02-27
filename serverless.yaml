@@ -5,6 +5,7 @@ service: my-express-application
 plugins:
   - serverless-dynamodb-local
   - serverless-offline
+  - serverless-offline-local-authorizers-plugin
 
 custom:
   tableName: "users-table-${self:provider.stage}"
@@ -28,14 +29,26 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
-        - cognito-idp:AdminGetUser
+        - cognito-idp:AdminInitiateAuth
+        - cognito-idp:AdminCreateUser
+        - cognito-idp:AdminSetUserPassword
       Resource:
         - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn"] }
-        - arn:aws:cognito-idp:us-west-2:544012685056:userpool/us-west-2_SXVQTWO6o
+        - { "Fn::GetAtt": ["CognitoUserPool", "Arn"] }
   environment:
     USERS_TABLE: ${self:custom.tableName}
+    user_pool_id: { Ref: CognitoUserPool }
+    client_id: { Ref: CognitoUserPoolClient }
 
 functions:
+  login:
+    handler: login.handler
+    events:
+      - http:
+          path: /login
+          method: post
+
+
   app:
     handler: index.handler
     events:
@@ -45,9 +58,16 @@ functions:
           integration: lambda
           authorizer:
             name: authorizer
-            arn: arn:aws:cognito-idp:us-west-2:544012685056:userpool/us-west-2_SXVQTWO6o
+            type: COGNITO_USER_POOLS
+            arn: 
+              Fn::GetAtt: 
+                - CognitoUserPool 
+                - Arn
             claims:
               - email
+          localAuthorizer:
+            name: "mylocalAuthProxyFn"
+            type: "request"
   getUser:
     handler: index.handler
     events:
@@ -76,6 +96,13 @@ resources:
       Type: AWS::Cognito::UserPool
       Properties:
         UserPoolName: ${self:provider.stage}-user-pool
+        Schema:
+          - Name: email
+            Required: true
+            Mutable: true
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 6
         UsernameAttributes:
           - email
         AutoVerifiedAttributes:
@@ -84,8 +111,11 @@ resources:
       Type: AWS::Cognito::UserPoolClient
       Properties:
         ClientName: ${self:provider.stage}-user-pool-client
+        GenerateSecret: false
         UserPoolId:
           Ref: CognitoUserPool
+        AccessTokenValidity: 5
+        IdTokenValidity: 5
         ExplicitAuthFlows:
           - ADMIN_NO_SRP_AUTH
-        GenerateSecret: false
+

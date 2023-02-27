@@ -1,17 +1,15 @@
 // index.js
 
 const serverless = require('serverless-http');
-const bodyParser = require('body-parser');
-const express = require('express')
+const express = require('express'),
+  CognitoExpress = require('cognito-express')
 const app = express()
 const AWS = require('aws-sdk');
-const cognito = new AWS.CognitoIdentityServiceProvider({ apiVersion: '2016-04-18' })
-
-
 
 const USERS_TABLE = process.env.USERS_TABLE;
 
 const IS_OFFLINE = process.env.IS_OFFLINE;
+
 let dynamoDb;
 if (IS_OFFLINE === 'true') {
   dynamoDb = new AWS.DynamoDB.DocumentClient({
@@ -23,11 +21,23 @@ if (IS_OFFLINE === 'true') {
   dynamoDb = new AWS.DynamoDB.DocumentClient();
 };
 
-app.use(bodyParser.json({ strict: false }));
+const cognitoExpress = new CognitoExpress({
+  region: "us-west-2",
+  cognitoUserPoolId: process.env.user_pool_id,
+  tokenUse: "id", //Possible Values: access | id
+  tokenExpiration: 3600000 //Up to default expiration of 1 hour (3600000 ms)
+});
 
 app.get('/', function (req, res) {
-  res.send('Hello World')
-})
+  let accessTokenFromClient = req.headers.authorization;
+  cognitoExpress.validate(accessTokenFromClient, function(err, response) {
+
+  	if (err) return res.status(401).send(err);
+
+  	res.locals.user = response;
+    res.status(200).send(response)
+  });
+});
 
 // Get User endpoint
 app.get('/users/:userId', function (req, res) {
